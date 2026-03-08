@@ -71,8 +71,8 @@ namespace S1200_STATION4
         {
             try
             {
-                bool beforeValue = (bool)_plcService.Read("DB5.DBX0.0");
-                _plcService.Write("DB5.DBX0.0", !beforeValue);
+                bool beforeValue = (bool)_plcService.Read("DB2.DBX4.0");
+                _plcService.Write("DB2.DBX4.0", !beforeValue);
             }
             catch (Exception ex)
             {
@@ -92,9 +92,32 @@ namespace S1200_STATION4
             }
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
-        {
+        private bool _isMonitoring = false;
 
+        private async void MonitorButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isMonitoring)
+            {
+                _isMonitoring = true;
+                MonitorButton.Content = "停止监听";
+
+                await _plcService.StartMonitorAsync(value =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        ObservationValue.Text = value.ToString("F2");
+                    });
+                });
+
+                // StartMonitorAsync 结束后（被Stop取消）才会到这里
+                _isMonitoring = false;
+                MonitorButton.Content = "开始监听";
+            }
+            else
+            {
+                _plcService.StopMonitor();
+                // 按钮状态由上面 await 结束后恢复，这里不用管
+            }
         }
     }
 }

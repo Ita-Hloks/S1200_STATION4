@@ -17,6 +17,7 @@ namespace S1200_STATION4.Components
         private int _failCount = 0;
 
         public bool IsConnected => _plc?.IsConnected == true;
+        private CancellationTokenSource _monitorCts;
 
         public event Action<bool> ConnectionStatusChanged;
 
@@ -119,6 +120,31 @@ namespace S1200_STATION4.Components
             {
                 // Disconnect() 时主动取消任务引发的正常异常，静默处理
             }
+        }
+
+        public async Task StartMonitorAsync(Action<float> onDataReceived)
+        {
+            _monitorCts = new CancellationTokenSource();
+
+            await Task.Run(async () =>
+            {
+                using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+
+                while (await timer.WaitForNextTickAsync(_monitorCts.Token).ConfigureAwait(false))
+                {
+                    lock (_plcLock)
+                    {
+                        var raw = _plc.Read("DB2.DBD0");  // Real类型在S7.Net里是DBD
+                        float value = BitConverter.ToSingle(BitConverter.GetBytes((uint)raw), 0);
+                        onDataReceived(value);  // 把数据传回去
+                    }
+                }
+            });
+        }
+
+        public void StopMonitor()
+        {
+            _monitorCts?.Cancel();
         }
 
         private void NotifyDisconnect()
